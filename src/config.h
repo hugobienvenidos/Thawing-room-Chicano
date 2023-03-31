@@ -40,7 +40,7 @@
 #define ONE_WIRE_BUS 13// Data wire is plugged into port 2 on the Arduin
 #define TEMPERATURE_PRECISION 12
 
-#define TIME_ACQ_DELAY 10000 //in ms the delay between temperature value refresh
+#define TIME_ACQ_DELAY 1000 //in ms the delay between temperature value refresh
 #define AVG_RESOLUTION 1000   //in ms the sampling for the Ts measure
 
 DeviceAddress ADDRESS_TA = { 0x28, 0x8C, 0x4B, 0xAD, 0x27, 0x19, 0x01, 0xCA }; // Ta

@@ -247,7 +247,7 @@ void loop() {
     avg_ts = buffer_sum / buffer_len;
 
     mqtt.publishData(AVG_TS_TOPIC, temp_data.AvgTs_N);
-    Serial.println("Temp data published");
+    // Serial.println("Temp data published");
     ts_avg_timer = millis();
   }
 
@@ -931,12 +931,12 @@ void updateTemperature() {
   DateTime now = rtc.now();
   sensors1.requestTemperatures();
 
-  uint16_t TA_analog = analog_inputs.readADC_SingleEnded(TA_AI);  // Ta
-  TA = (TA_analog - 0) * (50 + 50) / (1024 - 0) - 50;
+  float TA_analog = analog_inputs.readADC_SingleEnded(TA_AI);  // Ta
+  TA = (TA_analog - 120) * (320 + 30) / (32768 - 120) - 30;
   uint16_t TS_analog = analog_inputs.readADC_SingleEnded(TS_AI);  // Ts
-  TS = (TS_analog - 0) * (50 + 50) / (1024 - 0) - 50;
+  TS = (TS_analog - 0) * (50 + 50) / (26600 - 0) - 50;
   uint16_t TC_analog = analog_inputs.readADC_SingleEnded(TC_AI);  // Tc
-  TC = (TC_analog - 0) * (50 + 50) / (1024 - 0) - 50;
+  TC = (TC_analog - 0) * (50 + 50) / (26600 - 0) - 50;
   TI = sensors1.getTempC(ADDRESS_TI);  // Ti
 
   // TC1 = sensors1.getTempC(ADDRESS_TC1);  //PV /Ta
