@@ -12,7 +12,7 @@
 // setting PWM properties
 #define AIR_PWM     27   
 #define FREQ        5000 
-#define AIR_PIN     AO_0  
+#define AIR_PIN     AO0  
 #define RESOLUTION  8    
 
 //------------ IO's    -------------------------------------------------------------------->

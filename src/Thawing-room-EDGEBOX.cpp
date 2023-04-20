@@ -266,6 +266,7 @@ void loop() {
 
     // for debug purpose
     Serial.println("Average: " + String(temp_data.AvgTs_N));
+    Serial.println(digitalRead(DI0));
     Serial.println("Ts: " + String(TS));
     Serial.println("TC: " + String(TC));
     Serial.println("Ta: " + String(TA));
@@ -714,7 +715,7 @@ void callback(char *topic, byte *payload, unsigned int len) {
   // Sub A and Sub B value update
   if (strcmp(topic, sub_A) == 0 && START1 == 0 && START2 == 0 && STOP == 0) {
     N_SP.N_A = responseToFloat(payload, len);
-    N_SP.N_A = atoi((char *)payload);
+    // N_SP.N_A = atoi((char *)payload);
     Serial.println("A set to: " + String(N_SP.N_A));
     R_A = 1;
   }
@@ -932,11 +933,12 @@ void updateTemperature() {
   sensors1.requestTemperatures();
 
   float TA_analog = analog_inputs.readADC_SingleEnded(TA_AI);  // Ta
-  TA = (TA_analog - 120) * (320 + 30) / (32768 - 120) - 30;
+  // TA = (TA_analog - 120) * (320 + 30) / (32768 - 120) - 30;
+  TA = (TA_analog - 2708) * (50 + 20) / (13284 - 2708) - 20;
   uint16_t TS_analog = analog_inputs.readADC_SingleEnded(TS_AI);  // Ts
-  TS = (TS_analog - 0) * (50 + 50) / (26600 - 0) - 50;
+  TS = (TS_analog - 2708) * (50 + 20) / (13284 - 2708) - 20;
   uint16_t TC_analog = analog_inputs.readADC_SingleEnded(TC_AI);  // Tc
-  TC = (TC_analog - 0) * (50 + 50) / (26600 - 0) - 50;
+  TC = (TC_analog - 2708) * (50 + 20) / (13284 - 2708) - 20;
   TI = sensors1.getTempC(ADDRESS_TI);  // Ti
 
   // TC1 = sensors1.getTempC(ADDRESS_TC1);  //PV /Ta
