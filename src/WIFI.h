@@ -2,14 +2,19 @@
 #define MY_WIFI_H
 // #include "Arduino.h"
 #include "EEPROM.h"
+#include "SPIFFS.h"
+#include <Update.h>
 #include "secrets.h"
 #include <ESPmDNS.h>
 // #include <WiFiUdp.h>
 #include <WiFiMulti.h>
+#include <WiFiClient.h>
 #include <ArduinoOTA.h>
+#include "ESPAsyncWebServer.h"
 
 class WIFI {
   public:
+    void setUpWebServer();
     void localIP();
     void loopOTA();
     void setUpOTA();

@@ -1,6 +1,94 @@
 // #include "WiFiType.h"
 #include "WIFI.h"
 
+AsyncWebServer server(80);
+
+static void handle_update_progress_cb(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
+  if (!index){
+    int cmd = (filename.indexOf("spiffs") > -1) ? U_SPIFFS : U_FLASH;
+    // Update.runAsync(true);
+    if (!Update.begin(UPDATE_SIZE_UNKNOWN)) {
+      Update.printError(Serial);
+    }
+  }
+
+  if (Update.write(data, len) != len) {
+    Update.printError(Serial);
+  }
+
+  if (final) {
+    if (!Update.end(true)){
+      Update.printError(Serial);
+    }
+  }
+}
+
+
+void WIFI::setUpWebServer(){
+  if(!SPIFFS.begin(true)){
+    Serial.println("An Error has occurred while mounting SPIFFS");
+    return;
+  }
+
+
+  /*use mdns for host name resolution*/
+  if (!MDNS.begin("esp32")){ // http://esp32.local
+    Serial.println("Error setting up MDNS responder!");
+    while (1){
+      delay(1000);
+    }
+  }
+  Serial.println("mDNS responder started Pinche Hugo");
+  /*return index page which is stored in serverIndex */
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send(SPIFFS, "/index.html", "text/html");
+    // server.send(200, "text/html", loginIndex); 
+  });
+
+  server.on("/style.css", HTTP_GET, [](AsyncWebServerRequest *request){
+    request->send(SPIFFS, "/style.css", "text/css");
+  });
+
+  server.on("/serverIndex", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send(SPIFFS, "/server-index.html", "text/html");
+  });
+  /*handling uploading firmware file */
+  server.on("/reset", HTTP_POST, [](AsyncWebServerRequest *request) {
+    request->send(200, "text/plain", "Resetting...");
+    ESP.restart(); 
+  });
+
+  server.on("/update", HTTP_POST, []( AsyncWebServerRequest *request) {
+    request->send(200, "text/plain", (Update.hasError()) ? "FAIL" : "OK");
+    ESP.restart(); 
+    },
+    // [](AsyncWebServerRequest *request){
+    //   HTTPUpload &upload = server->upload();
+    //   if (upload.status == UPLOAD_FILE_START) {
+    //     Serial.printf("Update: %s\n", upload.filename.c_str());
+    //     if (!Update.begin(UPDATE_SIZE_UNKNOWN)){ // start with max available size
+    //       Update.printError(Serial);
+    //     }
+    //   }
+    //   else if (upload.status == UPLOAD_FILE_WRITE) {
+    //     /* flashing firmware to ESP*/
+    //     if (Update.write(upload.buf, upload.currentSize) != upload.currentSize) {
+    //       Update.printError(Serial);
+    //     }
+    //   }
+    //   else if (upload.status == UPLOAD_FILE_END) {
+    //     if (Update.end(true)){ // true to set the size to the current progress
+    //       Serial.printf("Update Success: %u\nRebooting...\n", upload.totalSize);
+    //     }
+    //     else {
+    //       Update.printError(Serial);
+    //     }
+    //   }
+    // }
+    handle_update_progress_cb);
+  server.begin();
+}
+
 void WIFI::setUpWiFi(){
   WiFi.begin(SECRET_SSID, SECRET_PASS);
   uint32_t notConnectedCounter = 0;

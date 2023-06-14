@@ -171,7 +171,8 @@ void setup() {
   pinMode(START_IO, INPUT);
 
   wifi.setUpWiFi();
-  wifi.setUpOTA();
+  // wifi.setUpOTA();
+  wifi.setUpWebServer();
   setUpRTC();
 
   mqtt.connect();
