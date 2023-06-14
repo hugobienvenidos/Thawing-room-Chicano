@@ -24,9 +24,13 @@
 
 #define A0_5  27                            
 
-#define STOP_IO     DI_0    
+// #define STOP_IO     DI_0    
+// #define DLY_S_IO    DI_1    
+// #define START_IO    DI_2    
+
+#define STOP_IO     DI_2    
 #define DLY_S_IO    DI_1    
-#define START_IO    DI_2    
+#define START_IO    DI_0  
 
 #define A0    13 //ONE_WIRE_BUS  
 
