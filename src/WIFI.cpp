@@ -23,8 +23,18 @@ static void handle_update_progress_cb(AsyncWebServerRequest *request, String fil
   }
 }
 
+/* Message callback of WebSerial */
+static void recvMsg(uint8_t *data, size_t len){
+  WebSerial.println("Received Data...");
+  String d = "";
+  for(int i=0; i < len; i++){
+    d += char(data[i]);
+  }
+  WebSerial.println(d);
+}
 
-void WIFI::setUpWebServer(){
+
+void WIFI::setUpWebServer(bool brigeSerial){
   if(!SPIFFS.begin(true)){
     Serial.println("An Error has occurred while mounting SPIFFS");
     return;
@@ -61,31 +71,12 @@ void WIFI::setUpWebServer(){
   server.on("/update", HTTP_POST, []( AsyncWebServerRequest *request) {
     request->send(200, "text/plain", (Update.hasError()) ? "FAIL" : "OK");
     ESP.restart(); 
-    },
-    // [](AsyncWebServerRequest *request){
-    //   HTTPUpload &upload = server->upload();
-    //   if (upload.status == UPLOAD_FILE_START) {
-    //     Serial.printf("Update: %s\n", upload.filename.c_str());
-    //     if (!Update.begin(UPDATE_SIZE_UNKNOWN)){ // start with max available size
-    //       Update.printError(Serial);
-    //     }
-    //   }
-    //   else if (upload.status == UPLOAD_FILE_WRITE) {
-    //     /* flashing firmware to ESP*/
-    //     if (Update.write(upload.buf, upload.currentSize) != upload.currentSize) {
-    //       Update.printError(Serial);
-    //     }
-    //   }
-    //   else if (upload.status == UPLOAD_FILE_END) {
-    //     if (Update.end(true)){ // true to set the size to the current progress
-    //       Serial.printf("Update Success: %u\nRebooting...\n", upload.totalSize);
-    //     }
-    //     else {
-    //       Update.printError(Serial);
-    //     }
-    //   }
-    // }
-    handle_update_progress_cb);
+  }, handle_update_progress_cb);
+  
+  if (brigeSerial) {
+    WebSerial.begin(&server);
+    WebSerial.onMessage(recvMsg);
+  }
   server.begin();
 }
 
