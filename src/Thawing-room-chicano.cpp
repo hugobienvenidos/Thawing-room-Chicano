@@ -1,9 +1,3 @@
-/* 
-################### EDGEBOX Instructions ###################
-### https://github.com/espressif/arduino-esp32/pull/7771 ###
-############################################################
-*/
-
 // adding analog read with SGM58031
 
 #include <SPI.h>
@@ -31,18 +25,14 @@ bool S1_state = 0;
 
 // A & B variables
 data_SP N_SP;
-float A = 0;
-float B = 0;
-bool R_A = 0;
-bool R_B = 0;
+float A = 0, B = 0;
+bool R_A = 0, R_B = 0;
 
 // PID variables
 data_PIDO PID_data;           // value of the PID output
 data_setpoint setpoint_data;  // value of the Setpoint
 
-bool R_P = 0;
-bool R_I = 0;
-bool R_D = 0;
+bool R_P = 0,  R_I = 0, R_D = 0;
 
 double Output;    // PWM signal and converter
 double PIDinput;  // temp sensor
@@ -61,8 +51,7 @@ data_s temp_data;
 
 // Ts & Tc target value
 data_tset N_tset;
-bool stop_temp1 = 0;
-bool stop_temp2 = 0;
+bool stop_temp1 = 0, stop_temp2 = 0;
 
 // Fan F1 value (1 parameter)
 data_F1 F1_data;
@@ -173,7 +162,7 @@ void setup() {
   wifi.setUpWiFi();
   wifi.setUpOTA();
   wifi.setUpWebServer(true);
-  setUpRTC();
+  // setUpRTC();
 
   mqtt.connect();
   mqtt.setCallback(callback);
@@ -267,7 +256,7 @@ void loop() {
 
     // for debug purpose
     WebSerial.println("Average: " + String(temp_data.AvgTs_N));
-    WebSerial.println(digitalRead(DI0));
+    // WebSerial.println(digitalRead(DI0));
     WebSerial.println("Ts: " + String(TS));
     WebSerial.println("TC: " + String(TC));
     WebSerial.println("Ta: " + String(TA));
@@ -520,7 +509,6 @@ void loop() {
       coefOutput = (coefPID * Output) / 100;  // Transform the Output of the PID to the desired max value
       WebSerial.println(coefOutput);
       air_in_feed_PID.Compute();
-      // analogWrite(A0_5, Output);
       ledcWrite(AIR_PWM, Output);
       Converted_Output = ((Output - 0) / (255 - 0)) * (10000 - 0) + 0;
       WebSerial.println("Converted_Output is " + String(Converted_Output));
@@ -533,7 +521,6 @@ void loop() {
       PIDinput = 0;
       Output = 0;
       coefOutput = 0;
-      // analogWrite(A0_5, Output);
       ledcWrite(AIR_PWM, Output);
       Converted_Output = ((Output - 0) / (255 - 0)) * (10000 - 0) + 0;
       WebSerial.println("Converted_Output is " + String(Converted_Output));
@@ -548,7 +535,6 @@ void loop() {
 
     // Turn All Output OFF
     ledcWrite(AIR_PWM, 0);
-    // analogWrite(A0_5, 0);
     digitalWrite(STAGE_1_IO, LOW);
     digitalWrite(STAGE_2_IO, LOW);
     digitalWrite(STAGE_3_IO, LOW);
@@ -895,7 +881,6 @@ void stopRoutine() {
     digitalWrite(VALVE_IO, LOW);
     digitalWrite(FAN_IO, LOW);
     ledcWrite(AIR_PWM, 0);
-    // analogWrite(A0_5, 0);
 
     stage = 0;
     Output = 0;
