@@ -30,7 +30,7 @@
 #define DLY_S_IO    PORT_B1   
 #define START_IO    PORT_B2
 
-#define A0    13 //ONE_WIRE_BUS  
+// #define A0    13 //ONE_WIRE_BUS  
 
 #define TA_AI       AI_1
 #define TS_AI       AI_2

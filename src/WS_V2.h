@@ -8,24 +8,24 @@
 
 // ###################### PORT B ######################
 
-#define PORT_B0 41
-#define PORT_B1 45
-#define PORT_B2 42
-#define PORT_B3 40
+#define PORT_B0 15
+#define PORT_B1 6
+#define PORT_B2 7
+#define PORT_B3 16
 
 // ###################### PORT C ######################
 
 #define PORT_C0 33
 #define PORT_C1 12
 #define PORT_C2 34
-#define PORT_C3 47
+#define PORT_C3 20
 
 // ###################### PORT D ######################
 
-#define PORT_D0 48
-#define PORT_D1 3
-#define PORT_D2 0
-#define PORT_D3 2
+#define PORT_D0 19
+#define PORT_D1 4
+#define PORT_D2 14
+#define PORT_D3 5
 
 // ###################### Analog OUTPUTS #######################
 
@@ -40,8 +40,8 @@
 
 // ########################## I2C PINS #########################
 
-#define I2C_SCL     PORT_D3
-#define I2C_SDA     PORT_D1
+#define I2C_SCL     42
+#define I2C_SDA     41
 
 
 

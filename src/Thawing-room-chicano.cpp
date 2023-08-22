@@ -6,7 +6,7 @@
 #include "RTClib.h"
 #include "config.h"
 #include <PID_v1.h>
-#include <OneWire.h>
+// #include <OneWire.h>
 #include <WiFiUdp.h>
 #include "secrets.h"
 #include <Arduino.h>
@@ -118,14 +118,15 @@ uint8_t buffer_len = 0;
 uint8_t buffer_index = 0;  // buffer index
 
 WIFI wifi;
+RTC_DS1307 rtc;
 MqttClient mqtt;
-RTC_PCF8563 rtc;
+TwoWire rtc_i2c = TwoWire(0);
 Adafruit_ADS1115 analog_inputs;
 
 PID air_in_feed_PID(&PIDinput, &Output, &Setpoint, Kp, Ki, Kd, DIRECT);  // DIRECT or REVERSE
 
-OneWire oneWire(ONE_WIRE_BUS);         // Setup a oneWire instance to communicate with any OneWire devices (not just Maxim/Dallas temperature ICs)
-DallasTemperature sensors1(&oneWire);  // PASS our oneWire reference to Dallas Temperature.
+// OneWire oneWire(ONE_WIRE_BUS);         // Setup a oneWire instance to communicate with any OneWire devices (not just Maxim/Dallas temperature ICs)
+// DallasTemperature sensors1(&oneWire);  // PASS our oneWire reference to Dallas Temperature.
 
 //---- Function declaration ----/////////////////////////////////////////////////////////////////////////////
 void setUpRTC();
@@ -140,8 +141,8 @@ void callback(char *topic, byte *payload, unsigned int len);  //callback functio
 
 void setup() {
   // WebSerial.begin(115200);
-
-  Wire.begin();
+  
+  // Wire.begin();
   analog_inputs.begin();
 
   setStage(0);
@@ -162,7 +163,7 @@ void setup() {
   wifi.setUpWiFi();
   wifi.setUpOTA();
   wifi.setUpWebServer(true);
-  // setUpRTC();
+  setUpRTC();
 
   mqtt.connect();
   mqtt.setCallback(callback);
@@ -172,10 +173,10 @@ void setup() {
   air_in_feed_PID.SetSampleTime(3000);
   //Adjust PID values
   air_in_feed_PID.SetTunings(Kp, Ki, Kd);
-  sensors1.setResolution(ADDRESS_TA, TEMPERATURE_PRECISION);
-  sensors1.setResolution(ADDRESS_TS, TEMPERATURE_PRECISION);
-  sensors1.setResolution(ADDRESS_TC, TEMPERATURE_PRECISION);
-  sensors1.setResolution(ADDRESS_TI, TEMPERATURE_PRECISION);
+  // sensors1.setResolution(ADDRESS_TA, TEMPERATURE_PRECISION);
+  // sensors1.setResolution(ADDRESS_TS, TEMPERATURE_PRECISION);
+  // sensors1.setResolution(ADDRESS_TC, TEMPERATURE_PRECISION);
+  // sensors1.setResolution(ADDRESS_TI, TEMPERATURE_PRECISION);
   delay(750);
 }
 
@@ -907,7 +908,9 @@ void stopRoutine() {
 }
 
 void setUpRTC() {
-  if (!rtc.begin()) {
+  rtc_i2c.begin(42, 41);
+
+  if (!rtc.begin(&rtc_i2c)) {
     WebSerial.println("Couldn't find RTC");
     while (1);
   }
@@ -916,7 +919,7 @@ void setUpRTC() {
 
 void updateTemperature() {
   DateTime now = rtc.now();
-  sensors1.requestTemperatures();
+  // sensors1.requestTemperatures();
 
   float TA_analog = analog_inputs.readADC_SingleEnded(TA_AI);  // Ta
   // TA = (TA_analog - 120) * (320 + 30) / (32768 - 120) - 30;
@@ -925,7 +928,7 @@ void updateTemperature() {
   TS = (TS_analog - 2708) * (50 + 20) / (13284 - 2708) - 20;
   uint16_t TC_analog = analog_inputs.readADC_SingleEnded(TC_AI);  // Tc
   TC = (TC_analog - 2708) * (50 + 20) / (13284 - 2708) - 20;
-  TI = sensors1.getTempC(ADDRESS_TI);  // Ti
+  // TI = sensors1.getTempC(ADDRESS_TI);  // Ti ===> NOT IMPLEMENTED
 
   // TC1 = sensors1.getTempC(ADDRESS_TC1);  //PV /Ta
   // TC2 = N_chooseTs ? getIRTemp() : sensors1.getTempC(ADDRESS_TC2);// Ts  // Condition to choose if Ts is a IR sensor or OneWire sensor
