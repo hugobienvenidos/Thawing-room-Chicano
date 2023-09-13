@@ -1,19 +1,16 @@
 // adding analog read with SGM58031
 
-#include <SPI.h>
 #include <Wire.h>
 #include "WIFI.h"
-#include "RTClib.h"
 #include "config.h"
 #include <PID_v1.h>
 // #include <OneWire.h>
 #include <WiFiUdp.h>
 #include "secrets.h"
 #include <Arduino.h>
+#include "Controller.h"
 #include "MqttClient.h"
-#include <Adafruit_ADS1X15.h>
 #include <DallasTemperature.h>
-// #include <Adafruit_Sensor.h>
 
 data_rtc N_rtc;  // structure data_rtc from the config file is renamed N_rtc
 data_st1 N_st1;  // fan (F1) STAGE 1 on and off time
@@ -118,19 +115,13 @@ uint8_t buffer_len = 0;
 uint8_t buffer_index = 0;  // buffer index
 
 WIFI wifi;
-RTC_DS1307 rtc;
 MqttClient mqtt;
-TwoWire rtc_i2c = TwoWire(0);
-Adafruit_ADS1115 analog_inputs;
+Controller controller;
 
 PID air_in_feed_PID(&PIDinput, &Output, &Setpoint, Kp, Ki, Kd, DIRECT);  // DIRECT or REVERSE
 
-// OneWire oneWire(ONE_WIRE_BUS);         // Setup a oneWire instance to communicate with any OneWire devices (not just Maxim/Dallas temperature ICs)
-// DallasTemperature sensors1(&oneWire);  // PASS our oneWire reference to Dallas Temperature.
-
 //---- Function declaration ----/////////////////////////////////////////////////////////////////////////////
-void setUpRTC();
-float getIRTemp();
+// float getIRTemp();
 void stopRoutine();
 void updateTemperature();
 void setStage(int Stage);
@@ -140,30 +131,18 @@ float responseToFloat(byte *value, size_t len);
 void callback(char *topic, byte *payload, unsigned int len);  //callback function for mqtt, see definition after loop
 
 void setup() {
-  // WebSerial.begin(115200);
-  
-  // Wire.begin();
-  analog_inputs.begin();
+  controller.init();
 
   setStage(0);
 
-  pinMode(STAGE_1_IO, OUTPUT);
-  pinMode(STAGE_2_IO, OUTPUT);
-  pinMode(STAGE_3_IO, OUTPUT);
-  pinMode(VALVE_IO, OUTPUT);
+  // Using FREE pins as digital outputs
   pinMode(FAN_IO, OUTPUT);
-
-  ledcSetup(AIR_PWM, FREQ, RESOLUTION);
-  ledcAttachPin(AIR_PIN, AIR_PWM);
-
-  pinMode(STOP_IO, INPUT);
-  pinMode(DLY_S_IO, INPUT);
-  pinMode(START_IO, INPUT);
+  controller.writeDigitalOutput(FAN_IO, LOW);
 
   wifi.setUpWiFi();
   wifi.setUpOTA();
-  wifi.setUpWebServer(true);
-  setUpRTC();
+  // wifi.setUpWebServer(true);
+  controller.setUpRTC();
 
   mqtt.connect();
   mqtt.setCallback(callback);
@@ -173,15 +152,11 @@ void setup() {
   air_in_feed_PID.SetSampleTime(3000);
   //Adjust PID values
   air_in_feed_PID.SetTunings(Kp, Ki, Kd);
-  // sensors1.setResolution(ADDRESS_TA, TEMPERATURE_PRECISION);
-  // sensors1.setResolution(ADDRESS_TS, TEMPERATURE_PRECISION);
-  // sensors1.setResolution(ADDRESS_TC, TEMPERATURE_PRECISION);
-  // sensors1.setResolution(ADDRESS_TI, TEMPERATURE_PRECISION);
   delay(750);
 }
 
 void loop() {
-  DateTime now = rtc.now();
+  DateTime now = controller.getDateTime();
 
   if (!wifi.isConnected()) {
     wifi.reconnect();
@@ -238,7 +213,7 @@ void loop() {
     avg_ts = buffer_sum / buffer_len;
 
     mqtt.publishData(AVG_TS_TOPIC, temp_data.AvgTs_N);
-    // WebSerial.println("Temp data published");
+    // LOGGER.println("Temp data published");
     ts_avg_timer = millis();
   }
 
@@ -256,31 +231,32 @@ void loop() {
     mqtt.publishData(TI_TOPIC, temp_data.Ti_N);
 
     // for debug purpose
-    WebSerial.println("Average: " + String(temp_data.AvgTs_N));
-    // WebSerial.println(digitalRead(DI0));
-    WebSerial.println("Ts: " + String(TS));
-    WebSerial.println("TC: " + String(TC));
-    WebSerial.println("Ta: " + String(TA));
-    WebSerial.println("Nstart: " + String(N_start));
-    WebSerial.println("Nstop: " + String(N_stop));
-    WebSerial.println("A variable: " + String(N_SP.N_A));
-    WebSerial.println("B variable: " + String(N_SP.N_B));
-    WebSerial.println("P variable: " + String(Kp));
-    WebSerial.println("I variable: " + String(Ki));
-    WebSerial.println("D variable: " + String(Kd));
-    WebSerial.println("setpoint raw: " + String(Setpoint));
-    WebSerial.println("setpoint: " + String(setpoint_data.PID_setpoint));
+    LOGGER.println("Average: " + String(temp_data.AvgTs_N));
+    // LOGGER.println(controller.readDigitalInput(DI0));
+    LOGGER.println("Ts: " + String(TS));
+    LOGGER.println("TC: " + String(TC));
+    LOGGER.println("Ta: " + String(TA));
+    LOGGER.println(controller.readAnalogInput(TA_AI));
+    LOGGER.println("Nstart: " + String(N_start));
+    LOGGER.println("Nstop: " + String(N_stop));
+    LOGGER.println("A variable: " + String(N_SP.N_A));
+    LOGGER.println("B variable: " + String(N_SP.N_B));
+    LOGGER.println("P variable: " + String(Kp));
+    LOGGER.println("I variable: " + String(Ki));
+    LOGGER.println("D variable: " + String(Kd));
+    LOGGER.println("setpoint raw: " + String(Setpoint));
+    LOGGER.println("setpoint: " + String(setpoint_data.PID_setpoint));
 
-    WebSerial.println("time: ");
-    WebSerial.print(String(now.hour()) + "h ");
-    WebSerial.println(String(now.minute()) + "min ");
-    WebSerial.print(String(now.day()) + "day ");
-    WebSerial.println(String(now.month()) + "month");
-    WebSerial.println("stage 2 time: ");
-    WebSerial.print(String(Stage2_hour) + "h ");
-    WebSerial.print(String(Stage2_minute) + "min ");
-    WebSerial.print(String(Stage2_day) + "day ");
-    WebSerial.print(String(Stage2_month) + "month");
+    LOGGER.println("time: ");
+    LOGGER.print(String(now.hour()) + "h ");
+    LOGGER.println(String(now.minute()) + "min ");
+    LOGGER.print(String(now.day()) + "day ");
+    LOGGER.println(String(now.month()) + "month");
+    LOGGER.println("stage 2 time: ");
+    LOGGER.print(String(Stage2_hour) + "h ");
+    LOGGER.print(String(Stage2_minute) + "min ");
+    LOGGER.print(String(Stage2_day) + "day ");
+    LOGGER.print(String(Stage2_month) + "month");
 
     get_temp_timer = millis();
   }
@@ -314,10 +290,10 @@ void loop() {
   // PID works only on STAGE 2
   if (stage == 2 && STOP == 0) {
     if (millis() - stg_2_pid_timer >= (TIME_ACQ_DELAY + 1)) {
-      WebSerial.println("Soft PID Actual Output is" + String(Output));
+      LOGGER.println("Soft PID Actual Output is" + String(Output));
       Output_float = float(coefOutput);
       PID_data.PID_output = ((Output_float - 0) / (255 - 0)) * (100 - 0) + 0;
-      WebSerial.println("PID Output /100 is" + String(PID_data.PID_output));
+      LOGGER.println("PID Output /100 is" + String(PID_data.PID_output));
 
       mqtt.publishData(PID_OUTPUT, PID_data.PID_output);
       stg_2_pid_timer = millis();
@@ -326,39 +302,39 @@ void loop() {
 
   //---- START, DELAYED, STOP Button pressed ----////////////////////////////////////////////////
   // delayed start push button or digital button pressed
-  if (digitalRead(DLY_S_IO) == 1 || N_d_start == 1) {
+  if (controller.readDigitalInput(DLY_S_IO) == 1 || N_d_start == 1) {
     START1 = 1;
-    WebSerial.println("Delayed Start Pressed");
+    LOGGER.println("Delayed Start Pressed");
     N_d_start = 0;
     F1_data.M_F1 = 2;
     S1_data.M_S1 = 2;
 
     mqtt.publishData(m_F1, F1_data.M_F1);
-    WebSerial.println("Stage 1 init M_F1 stop published ");
+    LOGGER.println("Stage 1 init M_F1 stop published ");
 
     mqtt.publishData(m_S1, S1_data.M_S1);
-    WebSerial.println("Stage 1 init M_S1 stop published");
+    LOGGER.println("Stage 1 init M_S1 stop published");
   }
 
   // start push button or digital button pressed
-  if (digitalRead(START_IO) == 1 || N_start == 1) {
+  if (controller.readDigitalInput(START_IO) == 1 || N_start == 1) {
     START2 = 1;
-    WebSerial.println("Start Pressed");
+    LOGGER.println("Start Pressed");
     N_start = 0;
     F1_data.M_F1 = 2;
     S1_data.M_S1 = 2;
 
     mqtt.publishData(m_F1, F1_data.M_F1);
-    WebSerial.println("Stage 1 init M_F1 stop published ");
+    LOGGER.println("Stage 1 init M_F1 stop published ");
 
     mqtt.publishData(m_S1, S1_data.M_S1);
-    WebSerial.println("Stage 1 init M_S1 stop published");
+    LOGGER.println("Stage 1 init M_S1 stop published");
   }
 
   // stop push button or digital button pressed
-  if (digitalRead(STOP_IO) == 1 || N_stop == 1) {
+  if (controller.readDigitalInput(STOP_IO) == 1 || N_stop == 1) {
     STOP = 1;
-    WebSerial.println("Stop Pressed");
+    LOGGER.println("Stop Pressed");
     N_stop = 0;
   }
 
@@ -373,22 +349,22 @@ void loop() {
        && Stage2_started == 0 && Stage2_RTC_set == 0)) {
 
     START1 = MTR_State = C1_state = 0;
-    digitalWrite(STAGE_1_IO, LOW);
-    digitalWrite(STAGE_2_IO, LOW);
-    digitalWrite(STAGE_3_IO, LOW);
-    digitalWrite(VALVE_IO, LOW);
-    digitalWrite(FAN_IO, LOW);
+    controller.writeDigitalOutput(STAGE_1_IO, LOW);
+    controller.writeDigitalOutput(STAGE_2_IO, LOW);
+    controller.writeDigitalOutput(STAGE_3_IO, LOW);
+    controller.writeDigitalOutput(VALVE_IO, LOW);
+    controller.writeDigitalOutput(FAN_IO, LOW);
 
     F1_data.M_F1 = 2;
     S1_data.M_S1 = 2;
 
     mqtt.publishData(m_F1, F1_data.M_F1);
-    WebSerial.println("All M_F1 stop published ");
+    LOGGER.println("All M_F1 stop published ");
 
     mqtt.publishData(m_S1, S1_data.M_S1);
-    WebSerial.println("All M_S1 stop published");
+    LOGGER.println("All M_S1 stop published");
 
-    WebSerial.println("Stage 2 Initiated wait for 5 secs");
+    LOGGER.println("Stage 2 Initiated wait for 5 secs");
     Stage2_RTC_set = Stage2_started = 1;
     delay(5000);
   }
@@ -396,37 +372,37 @@ void loop() {
   //---- STAGE 1 ----////////////////////////////////////////////////////////////////////////////
   if (START1 == 1 && Stage2_RTC_set == 0 && STOP == 0) {
     if (C1_state == 0) {
-      digitalWrite(STAGE_1_IO, HIGH);  // Turn On the LED of Stage 1
+      controller.writeDigitalOutput(STAGE_1_IO, HIGH);  // Turn On the LED of Stage 1
       C1_state = 1;                    // State of Stage 1 turned ON
-      WebSerial.println("Stage 1 Started");
+      LOGGER.println("Stage 1 Started");
       setStage(1);
-      WebSerial.println("Stage 1 Status Send packet ");
+      LOGGER.println("Stage 1 Status Send packet ");
       F1_timer = millis() - (N_st1.N_f1_st1_ontime * MINS);
     }
 
     // Turn ON F1
 
-    if (MTR_State == 0 && (HIGH != digitalRead(FAN_IO)) && (millis() - F1_timer >= (N_st1.N_f1_st1_offtime * MINS))) {  // MTR_State is the motor of F1
-      digitalWrite(FAN_IO, HIGH);                                                                                       // Turn ON F1
-      WebSerial.println("Stage 1 F1 On");
+    if (MTR_State == 0 && (HIGH != controller.readDigitalInput(FAN_IO)) && (millis() - F1_timer >= (N_st1.N_f1_st1_offtime * MINS))) {  // MTR_State is the motor of F1
+      controller.writeDigitalOutput(FAN_IO, HIGH);                                                                                       // Turn ON F1
+      LOGGER.println("Stage 1 F1 On");
       MTR_State = 1;
       F1_data.M_F1 = 1;  // When M_F1 = 1 ==> ON
 
       mqtt.publishData(m_F1, F1_data.M_F1);
-      WebSerial.println("Stage 1 init M_F1 ON published ");
+      LOGGER.println("Stage 1 init M_F1 ON published ");
       F1_timer = millis();
     }
 
     // Turn OFF F1 when the time set in the configuration is over
-    if (MTR_State == 1 && (LOW != digitalRead(FAN_IO)) && (millis() - F1_timer >= (N_st1.N_f1_st1_ontime * MINS))) {
-      digitalWrite(FAN_IO, LOW);
-      // ledcWrite(AIR_PWM, 0);
-      WebSerial.println("Stage 1 F1 Off");
+    if (MTR_State == 1 && (LOW != controller.readDigitalInput(FAN_IO)) && (millis() - F1_timer >= (N_st1.N_f1_st1_ontime * MINS))) {
+      controller.writeDigitalOutput(FAN_IO, LOW);
+      // controller.writeAnalogOutput(AIR_PWM, 0);
+      LOGGER.println("Stage 1 F1 Off");
       MTR_State = 0;
       F1_data.M_F1 = 2;  // When M_F1 = 2 ==> OFF
 
       mqtt.publishData(m_F1, F1_data.M_F1);
-      WebSerial.println("Stage 1 init M_F1 OFF published ");
+      LOGGER.println("Stage 1 init M_F1 OFF published ");
       F1_timer = millis();
     }
   }
@@ -434,61 +410,61 @@ void loop() {
   //---- STAGE 2 ----////////////////////////////////////////////////////////////////////////////
   if (Stage2_RTC_set == 1 && Stage3_started == 0 && STOP == 0) {
     if (C2_state == 0) {
-      digitalWrite(STAGE_2_IO, HIGH);  // Turn On the LED of Stage 2
+      controller.writeDigitalOutput(STAGE_2_IO, HIGH);  // Turn On the LED of Stage 2
 
       C2_state = 1;
-      WebSerial.println("Stage 2 Started");
+      LOGGER.println("Stage 2 Started");
       stage = 2;
       setStage(2);
-      WebSerial.println("Stage 0 Status Send packet ");
+      LOGGER.println("Stage 0 Status Send packet ");
       F1_stg_2_timmer = millis() - (N_st2.N_f1_st2_offtime * MINS);
     }
 
     // Turn ON F1 when time is over
     if (MTR_State == 0 && (millis() - F1_stg_2_timmer >= (N_st2.N_f1_st2_offtime * MINS))) {
-      digitalWrite(FAN_IO, HIGH);  // Output of F1
-      WebSerial.println("Stage 2 F1 On");
+      controller.writeDigitalOutput(FAN_IO, HIGH);  // Output of F1
+      LOGGER.println("Stage 2 F1 On");
       MTR_State = 1;
       F1_data.M_F1 = 1;  // When M_F1 = 1 ==> ON
 
       mqtt.publishData(m_F1, F1_data.M_F1);
-      WebSerial.println("stg2 F1 Start published ");
+      LOGGER.println("stg2 F1 Start published ");
       F1_stg_2_timmer = millis();
     }
 
     // Turn OFF F1 when time is over
     if (MTR_State == 1 && (millis() - F1_stg_2_timmer >= (N_st2.N_f1_st2_ontime * MINS))) {
-      digitalWrite(FAN_IO, LOW);
-      WebSerial.println("Stage 2 F1 Off");
+      controller.writeDigitalOutput(FAN_IO, LOW);
+      LOGGER.println("Stage 2 F1 Off");
       MTR_State = 0;
       F1_data.M_F1 = 2;  // When M_F1 = 2 ==> OFF
 
       mqtt.publishData(m_F1, F1_data.M_F1);
-      WebSerial.println("stg2 F1 stop published ");
+      LOGGER.println("stg2 F1 stop published ");
       F1_stg_2_timmer = millis();
     }
 
     // Turn ON S1 when time is over
     if ((MTR_State == 1) && (S1_state == 0) && (millis() - S1_stg_2_timer >= (N_st2.N_s1_st2_offtime * MINS))) {
-      digitalWrite(VALVE_IO, HIGH);  // Output of S1
+      controller.writeDigitalOutput(VALVE_IO, HIGH);  // Output of S1
       S1_state = 1;
-      WebSerial.println("Stage 2 S1 ON");
+      LOGGER.println("Stage 2 S1 ON");
       S1_data.M_S1 = 1;  // When M_S1 = 1 ==> ON
 
       mqtt.publishData(m_S1, S1_data.M_S1);
-      WebSerial.println("stg2 S1 start published");
+      LOGGER.println("stg2 S1 start published");
       S1_stg_2_timer = millis();
     }
 
     // Turn OFF S1 when time is over
     if ((S1_state == 1 && (millis() - S1_stg_2_timer >= (N_st2.N_s1_st2_ontime * MINS))) || (MTR_State == 0)) {
-      digitalWrite(VALVE_IO, LOW);  // Output of S1
+      controller.writeDigitalOutput(VALVE_IO, LOW);  // Output of S1
       S1_state = 0;
-      WebSerial.println("Stage 2 S1 OFF");
+      LOGGER.println("Stage 2 S1 OFF");
       S1_data.M_S1 = 2;  // When M_S1 = 2 ==> OFF
 
       mqtt.publishData(m_S1, S1_data.M_S1);
-      WebSerial.println("stg2 S1 stop published");
+      LOGGER.println("stg2 S1 stop published");
 
       S1_stg_2_timer = millis();
     }
@@ -500,7 +476,7 @@ void loop() {
 
       mqtt.publishData(SETPOINT, setpoint_data.PID_setpoint);
 
-      WebSerial.println("Setpoint published");
+      LOGGER.println("Setpoint published");
       pid_computing_timer = millis();
     }
 
@@ -508,11 +484,11 @@ void loop() {
     if (MTR_State == 1 && (millis() - turn_on_pid_timer >= 3000)) {
       PIDinput = TA_F;
       coefOutput = (coefPID * Output) / 100;  // Transform the Output of the PID to the desired max value
-      WebSerial.println(coefOutput);
+      LOGGER.println(coefOutput);
       air_in_feed_PID.Compute();
-      ledcWrite(AIR_PWM, Output);
+      controller.writeAnalogOutput(AIR_PWM, Output);
       Converted_Output = ((Output - 0) / (255 - 0)) * (10000 - 0) + 0;
-      WebSerial.println("Converted_Output is " + String(Converted_Output));
+      LOGGER.println("Converted_Output is " + String(Converted_Output));
       turn_on_pid_timer = millis();
     }
 
@@ -522,9 +498,9 @@ void loop() {
       PIDinput = 0;
       Output = 0;
       coefOutput = 0;
-      ledcWrite(AIR_PWM, Output);
+      controller.writeAnalogOutput(AIR_PWM, Output);
       Converted_Output = ((Output - 0) / (255 - 0)) * (10000 - 0) + 0;
-      WebSerial.println("Converted_Output is " + String(Converted_Output));
+      LOGGER.println("Converted_Output is " + String(Converted_Output));
       turn_off_pid_timer = millis();
     }
   }
@@ -535,27 +511,27 @@ void loop() {
     START1 = START2 = Stage2_RTC_set = MTR_State = 0;
 
     // Turn All Output OFF
-    ledcWrite(AIR_PWM, 0);
-    digitalWrite(STAGE_1_IO, LOW);
-    digitalWrite(STAGE_2_IO, LOW);
-    digitalWrite(STAGE_3_IO, LOW);
-    digitalWrite(VALVE_IO, LOW);
-    digitalWrite(FAN_IO, LOW);
+    controller.writeAnalogOutput(AIR_PWM, 0);
+    controller.writeDigitalOutput(STAGE_1_IO, LOW);
+    controller.writeDigitalOutput(STAGE_2_IO, LOW);
+    controller.writeDigitalOutput(STAGE_3_IO, LOW);
+    controller.writeDigitalOutput(VALVE_IO, LOW);
+    controller.writeDigitalOutput(FAN_IO, LOW);
     Output = 0;
     coefOutput = 0;
 
     F1_data.M_F1 = 2;  // When M_F1 = 2 ==> OFF
 
     mqtt.publishData(m_F1, F1_data.M_F1);
-    WebSerial.println("stage 3 F1 init published ");
+    LOGGER.println("stage 3 F1 init published ");
 
     S1_data.M_S1 = 2;  // When M_S1 = 2 ==> OFF
 
     mqtt.publishData(m_S1, S1_data.M_S1);
-    WebSerial.println("stage 2 S1 init published");
+    LOGGER.println("stage 2 S1 init published");
 
     C2_state = S1_state = 0;  // Put the all the states to 0
-    WebSerial.println("Stage 3 Initiated");
+    LOGGER.println("Stage 3 Initiated");
     Stage3_started = 1;
   }
 
@@ -563,60 +539,60 @@ void loop() {
   if (Stage3_started == 1 && Stage2_started == 1 && STOP == 0) {
     // State of Stage 3 turned to 1
     if (C3_state == 0) {
-      digitalWrite(STAGE_3_IO, HIGH);  // Turn ON the LED of Stage 3
+      controller.writeDigitalOutput(STAGE_3_IO, HIGH);  // Turn ON the LED of Stage 3
 
       C3_state = 1;
-      WebSerial.println("Stage 3 Started");
+      LOGGER.println("Stage 3 Started");
       setStage(3);
-      WebSerial.println("Stage 3 Status Send packet ");
+      LOGGER.println("Stage 3 Status Send packet ");
       F1_stg_3_timer = millis() - (N_st3.N_f1_st3_offtime * MINS);
     }
 
     // Turn ON F1 when time is over
     if (MTR_State == 0 && (millis() - F1_stg_3_timer >= (N_st3.N_f1_st3_offtime * MINS))) {
-      digitalWrite(FAN_IO, HIGH);
-      // ledcWrite(AIR_PWM, duty_cycle);
-      WebSerial.println("Stage 3 F1 On");
+      controller.writeDigitalOutput(FAN_IO, HIGH);
+      // controller.writeAnalogOutput(AIR_PWM, duty_cycle);
+      LOGGER.println("Stage 3 F1 On");
       MTR_State = 1;
       F1_data.M_F1 = 1;
 
       mqtt.publishData(m_F1, F1_data.M_F1);
-      WebSerial.println("stage 3 F1 start published ");
+      LOGGER.println("stage 3 F1 start published ");
       F1_stg_3_timer = millis();
     }
 
     // Turn OFF F1 when time is over
     if (MTR_State == 1 && (millis() - F1_stg_3_timer >= (N_st3.N_f1_st3_ontime * MINS))) {
-      digitalWrite(FAN_IO, LOW);
-      // ledcWrite(AIR_PWM, 0);
-      WebSerial.println("Stage 3 F1 Off");
+      controller.writeDigitalOutput(FAN_IO, LOW);
+      // controller.writeAnalogOutput(AIR_PWM, 0);
+      LOGGER.println("Stage 3 F1 Off");
       MTR_State = 0;
       F1_data.M_F1 = 2;
 
       mqtt.publishData(m_F1, F1_data.M_F1);
-      WebSerial.println("stage 3 F1 stop published ");
+      LOGGER.println("stage 3 F1 stop published ");
       F1_stg_3_timer = millis();
     }
 
     if (S1_state == 0 && (millis() - S1_stg_3_timer >= (N_st3.N_s1_st3_offtime * MINS))) {
-      digitalWrite(VALVE_IO, HIGH);
+      controller.writeDigitalOutput(VALVE_IO, HIGH);
       S1_state = 1;
-      WebSerial.println("Stage 3 S1 ON");
+      LOGGER.println("Stage 3 S1 ON");
       S1_data.M_S1 = 1;
 
       mqtt.publishData(m_S1, S1_data.M_S1);
-      WebSerial.println("stg3 S1 start published");
+      LOGGER.println("stg3 S1 start published");
       S1_stg_3_timer = millis();
     }
 
     if (S1_state == 1 && (millis() - S1_stg_3_timer >= (N_st3.N_s1_st3_ontime * MINS))) {
-      digitalWrite(VALVE_IO, LOW);
+      controller.writeDigitalOutput(VALVE_IO, LOW);
       S1_state = 0;
-      WebSerial.println("Stage 3 S1 OFF with value of S1 ");
+      LOGGER.println("Stage 3 S1 OFF with value of S1 ");
       S1_data.M_S1 = 2;
 
       mqtt.publishData(m_S1, S1_data.M_S1);
-      WebSerial.println("stg3 S1 stop published");
+      LOGGER.println("stg3 S1 stop published");
       S1_stg_3_timer = millis();
     }
   }
@@ -624,264 +600,173 @@ void loop() {
 
 //// fct Callback ==> RECEIVE MQTT MESSAGES ////////////////////////////////////////////////////////////////////
 void callback(char *topic, byte *payload, unsigned int len) {
-  WebSerial.println("Message arrived [" + String(topic) + "]");
+  LOGGER.println("Message arrived [" + String(topic) + "]");
 
   // Delayed start timing
   if (strcmp(topic, sub_hours) == 0 && START1 == 0 && START2 == 0 && STOP == 0) {
     Stage2_hour = responseToFloat(payload, len);
-    WebSerial.println("Stage 2 Hours set to: " + String(Stage2_minute));
+    LOGGER.println("Stage 2 Hours set to: " + String(Stage2_minute));
   }
 
   if (strcmp(topic, sub_minutes) == 0 && START1 == 0 && START2 == 0 && STOP == 0) {
     Stage2_minute = responseToFloat(payload, len);
-    WebSerial.println("Stage 2 Minutes set to: " + String(Stage2_minute));
+    LOGGER.println("Stage 2 Minutes set to: " + String(Stage2_minute));
   }
 
   if (strcmp(topic, sub_day) == 0 && START1 == 0 && START2 == 0 && STOP == 0) {
     Stage2_day = responseToFloat(payload, len);
-    WebSerial.println("Stage 2 Day set to: " + String(Stage2_day));
+    LOGGER.println("Stage 2 Day set to: " + String(Stage2_day));
   }
 
   if (strcmp(topic, sub_month) == 0 && START1 == 0 && START2 == 0 && STOP == 0) {
     Stage2_month = responseToFloat(payload, len);
-    WebSerial.println("Stage 2 Month set to: " + String(N_rtc.N_month));
+    LOGGER.println("Stage 2 Month set to: " + String(N_rtc.N_month));
   }
 
   //F1 stg1 on/off time
   if (strcmp(topic, sub_f1_st1_ontime) == 0 && START1 == 0 && START2 == 0 && STOP == 0) {
     N_st1.N_f1_st1_ontime = responseToFloat(payload, len);
-    WebSerial.println("F1 Stage 1 on time set to: " + String(N_st1.N_f1_st1_ontime) + " MINS");
+    LOGGER.println("F1 Stage 1 on time set to: " + String(N_st1.N_f1_st1_ontime) + " MINS");
   }
 
   if (strcmp(topic, sub_f1_st1_offtime) == 0 && START1 == 0 && START2 == 0 && STOP == 0) {
     N_st1.N_f1_st1_offtime = responseToFloat(payload, len);
-    WebSerial.println("F1 Stage 1 off time set to: " + String(N_st1.N_f1_st1_offtime) + " MINS");
+    LOGGER.println("F1 Stage 1 off time set to: " + String(N_st1.N_f1_st1_offtime) + " MINS");
   }
 
   // F1 and S1 STAGE 2 on/off time
   if (strcmp(topic, sub_f1_st2_ontime) == 0 && START1 == 0 && START2 == 0 && STOP == 0) {
     N_st2.N_f1_st2_ontime = responseToFloat(payload, len);
-    WebSerial.println("F1 Stage 2 on time set to: " + String(N_st2.N_f1_st2_ontime) + " MINS");
+    LOGGER.println("F1 Stage 2 on time set to: " + String(N_st2.N_f1_st2_ontime) + " MINS");
   }
 
   if (strcmp(topic, sub_f1_st2_offtime) == 0 && START1 == 0 && START2 == 0 && STOP == 0) {
     N_st2.N_f1_st2_offtime = responseToFloat(payload, len);
-    WebSerial.println("F1 Stage 2 off time set to: " + String(N_st2.N_f1_st2_offtime) + " MINS");
+    LOGGER.println("F1 Stage 2 off time set to: " + String(N_st2.N_f1_st2_offtime) + " MINS");
   }
 
   if (strcmp(topic, sub_s1_st2_ontime) == 0 && START1 == 0 && START2 == 0 && STOP == 0) {
     N_st2.N_s1_st2_ontime = responseToFloat(payload, len);
-    WebSerial.println("S1 Stage 2 on time set to: " + String(N_st2.N_s1_st2_ontime) + " MINS");
+    LOGGER.println("S1 Stage 2 on time set to: " + String(N_st2.N_s1_st2_ontime) + " MINS");
   }
 
   if (strcmp(topic, sub_s1_st2_offtime) == 0 && START1 == 0 && START2 == 0 && STOP == 0) {
     N_st2.N_s1_st2_offtime = responseToFloat(payload, len);
-    WebSerial.println("S1 Stage 2 off time set to: " + String(N_st2.N_s1_st2_offtime) + " MINS");
+    LOGGER.println("S1 Stage 2 off time set to: " + String(N_st2.N_s1_st2_offtime) + " MINS");
   }
 
   // F1 and S1 STAGE 3 on/off time
   if (strcmp(topic, sub_f1_st3_ontime) == 0 && START1 == 0 && START2 == 0 && STOP == 0) {
     N_st3.N_f1_st3_ontime = responseToFloat(payload, len);
-    WebSerial.println("F1 Stage 3 on time set to: " + String(N_st3.N_f1_st3_ontime) + " MINS");
+    LOGGER.println("F1 Stage 3 on time set to: " + String(N_st3.N_f1_st3_ontime) + " MINS");
   }
 
   if (strcmp(topic, sub_f1_st3_offtime) == 0 && START1 == 0 && START2 == 0 && STOP == 0) {
     N_st3.N_f1_st3_offtime = responseToFloat(payload, len);
-    WebSerial.println("F1 Stage 3 off time set to: " + String(N_st3.N_f1_st3_offtime) + " MINS");
+    LOGGER.println("F1 Stage 3 off time set to: " + String(N_st3.N_f1_st3_offtime) + " MINS");
   }
 
   if (strcmp(topic, sub_s1_st3_ontime) == 0 && START1 == 0 && START2 == 0 && STOP == 0) {
     N_st3.N_s1_st3_ontime = responseToFloat(payload, len);
-    WebSerial.println("S1 Stage 3 on time set to: " + String(N_st3.N_s1_st3_ontime) + " MINS");
+    LOGGER.println("S1 Stage 3 on time set to: " + String(N_st3.N_s1_st3_ontime) + " MINS");
   }
 
   if (strcmp(topic, sub_s1_st3_offtime) == 0 && START1 == 0 && START2 == 0 && STOP == 0) {
     N_st3.N_s1_st3_offtime = responseToFloat(payload, len);
-    WebSerial.println("S1 Stage 3 off time set to: " + String(N_st3.N_s1_st3_offtime) + " MINS");
+    LOGGER.println("S1 Stage 3 off time set to: " + String(N_st3.N_s1_st3_offtime) + " MINS");
   }
 
   // Sub A and Sub B value update
   if (strcmp(topic, sub_A) == 0 && START1 == 0 && START2 == 0 && STOP == 0) {
     N_SP.N_A = responseToFloat(payload, len);
     // N_SP.N_A = atoi((char *)payload);
-    WebSerial.println("A set to: " + String(N_SP.N_A));
+    LOGGER.println("A set to: " + String(N_SP.N_A));
     R_A = 1;
   }
 
   if (strcmp(topic, sub_B) == 0 && START1 == 0 && START2 == 0 && STOP == 0) {
     N_SP.N_B = responseToFloat(payload, len);
-    WebSerial.println("B set to: " + String(N_SP.N_B));
+    LOGGER.println("B set to: " + String(N_SP.N_B));
     R_B = 1;
   }
 
   // PID update
   if (strcmp(topic, sub_P) == 0 && START1 == 0 && START2 == 0 && STOP == 0) {
     Kp = responseToFloat(payload, len);
-    WebSerial.println("P set to: " + String(Kp));
+    LOGGER.println("P set to: " + String(Kp));
     R_P = 1;
   }
 
   if (strcmp(topic, sub_I) == 0 && START1 == 0 && START2 == 0 && STOP == 0) {
     Ki = responseToFloat(payload, len);
-    WebSerial.println("I set to: " + String(Ki));
+    LOGGER.println("I set to: " + String(Ki));
     R_I = 1;
   }
 
   if (strcmp(topic, sub_D) == 0 && START1 == 0 && START2 == 0 && STOP == 0) {
     Kd = responseToFloat(payload, len);
-    WebSerial.println("D set to: " + String(Kd));
+    LOGGER.println("D set to: " + String(Kd));
     R_D = 1;
   }
 
   if (R_P == 1 && R_I == 1 && R_D == 1 && START1 == 0 && START2 == 0 && STOP == 0) {
     air_in_feed_PID.SetTunings(Kp, Ki, Kd);
-    WebSerial.println("New PID parameter updated");
+    LOGGER.println("New PID parameter updated");
     R_P = R_I = R_D = 0;
   }
 
   if (strcmp(topic, sub_coefPID) == 0 && START1 == 0 && START2 == 0 && STOP == 0) {
     coefPID = responseToInt(payload, len);
-    WebSerial.print("coef PID : " + String(coefPID));
+    LOGGER.print("coef PID : " + String(coefPID));
   }
 
   // Target temperature Ts & Tc update
   if (strcmp(topic, sub_ts_set) == 0 && START1 == 0 && START2 == 0 && STOP == 0) {
     N_tset.N_ts_set = responseToFloat(payload, len);
-    WebSerial.println("Ts Condition set to: " + String(N_tset.N_ts_set));
+    LOGGER.println("Ts Condition set to: " + String(N_tset.N_ts_set));
   }
 
   if (strcmp(topic, sub_tc_set) == 0 && START1 == 0 && START2 == 0 && STOP == 0) {
     N_tset.N_tc_set = responseToFloat(payload, len);
     // Tc_cond = N_tset->N_tc_set;
-    WebSerial.println("Tc Condition set to: " + String(N_tset.N_tc_set));
+    LOGGER.println("Tc Condition set to: " + String(N_tset.N_tc_set));
   }
 
   // START
   if (strcmp(topic, sub_start) == 0 && START1 == 0 && START2 == 0 && STOP == 0) {
     N_start = responseToInt(payload, len);
-    WebSerial.println("START BUTTON PRESSED ON NODE RED" + String(N_start));
+    LOGGER.println("START BUTTON PRESSED ON NODE RED" + String(N_start));
   }
 
   // D_START
   if ((strcmp(topic, sub_d_start) == 0) && START2 == 0 && STOP == 0) {
     N_d_start = responseToInt(payload, len);
-    WebSerial.println("d_start BUTTON PRESSED ON NODE RED" + String(N_d_start));
+    LOGGER.println("d_start BUTTON PRESSED ON NODE RED" + String(N_d_start));
   }
 
   // STOP
   if (strcmp(topic, sub_stop) == 0) {
     N_stop = responseToInt(payload, len);
-    WebSerial.println("stop BUTTON PRESSED ON NODE RED" + String(N_stop));
+    LOGGER.println("stop BUTTON PRESSED ON NODE RED" + String(N_stop));
   }
 
   // Choose TS
   if (strcmp(topic, sub_chooseTs) == 0) {
     N_chooseTs = responseToInt(payload, len);
-    WebSerial.println("Ts is now IR" + String(N_chooseTs));
+    LOGGER.println("Ts is now IR" + String(N_chooseTs));
   }
-
-  // Address MQTT
-  // if (strcmp(topic, sub_address1) == 0) {
-  //   WebSerial.print("Me la pelas");
-  //   String S_address1;
-  //   char *tmp;
-  //   int i = 0;
-
-  //   for (int i = 0; i < len; i++) {
-  //     S_address1 += (char)payload[i];
-  //   }
-
-  //   tmp = strtok(&S_address1[0], ",");
-
-  //   while (tmp) {
-  //     N_address1[i++] = atoi(tmp);
-  //     tmp = strtok(NULL, ",");
-  //   }
-
-  //   for (int i = 0; i < 8; i++) {
-  //     EEPROM.write(i, N_address1[i]);
-  //     WebSerial.println(EEPROM.read(i));
-  //   }
-  // }
-
-  // if (strcmp(topic, sub_address2) == 0) {
-  //   WebSerial.println(" Test add2");
-  //   String S_address2;
-  //   char *tmp;
-  //   int i = 0;
-
-  //   for (int i = 0; i < len; i++) {
-  //     S_address2 += (char)payload[i];
-  //   }
-
-  //   tmp = strtok(&S_address2[0], ",");
-
-  //   while (tmp) {
-  //     N_address2[i++] = atoi(tmp);
-  //     tmp = strtok(NULL, ",");
-  //   }
-
-  //   for (int i = 8; i < 16; i++) {
-  //     EEPROM.write(i, N_address2[i - 8]);
-  //     WebSerial.println(EEPROM.read(i));
-  //   }
-  // }
-
-  // if (strcmp(topic, sub_address3) == 0) {
-  //   String S_address3;
-  //   char *tmp;
-  //   int i = 0;
-
-  //   for (int i = 0; i < len; i++) {
-  //     S_address3 += (char)payload[i];
-  //   }
-
-  //   tmp = strtok(&S_address3[0], ",");
-
-  //   while (tmp) {
-  //     N_address3[i++] = atoi(tmp);
-  //     tmp = strtok(NULL, ",");
-  //   }
-
-  //   for (int i = 16; i < 24; i++) {
-  //     EEPROM.write(i, N_address3[i - 16]);
-  //     WebSerial.println(EEPROM.read(i));
-  //   }
-  //}
-
-  // if (strcmp(topic, sub_address4) == 0) {
-  //   String S_address4;
-  //   char *tmp;
-  //   int i = 0;
-
-  //   for (int i = 0; i < len; i++) {
-  //     S_address4 += (char)payload[i];
-  //   }
-
-  //   tmp = strtok(&S_address4[0], ",");
-
-  //   while (tmp) {
-  //     N_address4[i++] = atoi(tmp);
-  //     tmp = strtok(NULL, ",");
-  //   }
-
-  //   for (int i = 24; i < 32; i++) {
-  //     EEPROM.write(i, N_address4[i - 24]);
-  //     WebSerial.println(EEPROM.read(i));
-  //   }
-  // }
 }
 
 //// Stop button pressed ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void stopRoutine() {
   if (stop_temp1 == 0) {
-    WebSerial.println("PROCESS STOP INITIATED");
-    digitalWrite(STAGE_1_IO, LOW);
-    digitalWrite(STAGE_2_IO, LOW);
-    digitalWrite(STAGE_3_IO, LOW);
-    digitalWrite(VALVE_IO, LOW);
-    digitalWrite(FAN_IO, LOW);
-    ledcWrite(AIR_PWM, 0);
+    LOGGER.println("PROCESS STOP INITIATED");
+    controller.writeDigitalOutput(STAGE_1_IO, LOW);
+    controller.writeDigitalOutput(STAGE_2_IO, LOW);
+    controller.writeDigitalOutput(STAGE_3_IO, LOW);
+    controller.writeDigitalOutput(VALVE_IO, LOW);
+    controller.writeDigitalOutput(FAN_IO, LOW);
+    controller.writeAnalogOutput(AIR_PWM, 0);
 
     stage = 0;
     Output = 0;
@@ -893,7 +778,7 @@ void stopRoutine() {
     mqtt.publishData(m_F1, F1_data.M_F1);
     mqtt.publishData(m_S1, S1_data.M_S1);
     setStage(0);
-    WebSerial.println("Stage 0 Status Send packet ");
+    LOGGER.println("Stage 0 Status Send packet ");
   }
 
   if (stop_temp2 == 0) {
@@ -902,39 +787,19 @@ void stopRoutine() {
   }
 
   if (stop_temp2 == 1) {
-    WebSerial.println("PROCESS STOPPED");
+    LOGGER.println("PROCESS STOPPED");
     stop_temp1 = stop_temp2 = STOP = 0;
   }
 }
 
-void setUpRTC() {
-  rtc_i2c.begin(42, 41);
-
-  if (!rtc.begin(&rtc_i2c)) {
-    WebSerial.println("Couldn't find RTC");
-    while (1);
-  }
-  rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
-}
-
 void updateTemperature() {
-  DateTime now = rtc.now();
-  // sensors1.requestTemperatures();
+  TA = controller.readTempFrom(TA_AI);
+  // TS = controller.readTempFrom(TS_AI);
+  // TC = controller.readTempFrom(TC_AI);
 
-  float TA_analog = analog_inputs.readADC_SingleEnded(TA_AI);  // Ta
-  // TA = (TA_analog - 120) * (320 + 30) / (32768 - 120) - 30;
-  TA = (TA_analog - 2708) * (50 + 20) / (13284 - 2708) - 20;
-  uint16_t TS_analog = analog_inputs.readADC_SingleEnded(TS_AI);  // Ts
-  TS = (TS_analog - 2708) * (50 + 20) / (13284 - 2708) - 20;
-  uint16_t TC_analog = analog_inputs.readADC_SingleEnded(TC_AI);  // Tc
-  TC = (TC_analog - 2708) * (50 + 20) / (13284 - 2708) - 20;
-  // TI = sensors1.getTempC(ADDRESS_TI);  // Ti ===> NOT IMPLEMENTED
-
-  // TC1 = sensors1.getTempC(ADDRESS_TC1);  //PV /Ta
-  // TC2 = N_chooseTs ? getIRTemp() : sensors1.getTempC(ADDRESS_TC2);// Ts  // Condition to choose if Ts is a IR sensor or OneWire sensor
-  // TC2 = true ? getIRTemp() : sensors1.getTempC(ADDRESS_TC2);  // Ts  // Condition to choose if Ts is a IR sensor or OneWire sensor
-  // TC3 = sensors1.getTempC(ADDRESS_TC3);                       // Tc
-  // TC4 = sensors1.getTempC(ADDRESS_TC4);                       // Ti
+  // TA = 0;
+  TS = 0;
+  TC = 0;
 }
 
 String addressToString(uint8_t *address) {
@@ -964,16 +829,16 @@ int responseToInt(byte *value, size_t len) {
   return puta_mierda_mal_parida.toInt();
 }
 
-float getIRTemp() {
-  uint16_t result;
-  float temperature;
-  Wire.beginTransmission(IR_SENSOR_ADDRESS);
-  Wire.write(READ_TEMPERATURE);
-  Wire.endTransmission(false);
-  Wire.requestFrom(IR_SENSOR_ADDRESS, 2);
-  result = Wire.read();
-  result |= Wire.read() << 8;
+// float getIRTemp() {
+//   uint16_t result;
+//   float temperature;
+//   Wire.beginTransmission(IR_SENSOR_ADDRESS);
+//   Wire.write(READ_TEMPERATURE);
+//   Wire.endTransmission(false);
+//   Wire.requestFrom(IR_SENSOR_ADDRESS, 2);
+//   result = Wire.read();
+//   result |= Wire.read() << 8;
 
-  temperature = result * 0.02 - 273.15;
-  return temperature;
-}
+//   temperature = result * 0.02 - 273.15;
+//   return temperature;
+// }

@@ -1,3 +1,5 @@
+#ifndef CONFIG_H
+#define CONFIG_H
 #include <Arduino.h>
 #include "WS_V2.h"
 #include <DallasTemperature.h>
@@ -9,17 +11,21 @@
 #define HIGH_TEMP_LIMIT 60
 #define LOW_TEMP_LIMIT -40
 
+//I2C INTERFACE
+#define SDA 42
+#define SCL 41
+
 // setting PWM properties
-#define AIR_PWM     27   
+#define AIR_PWM     7   
 #define FREQ        5000 
 #define AIR_PIN     PORT_C2  
-#define RESOLUTION  8    
+#define RESOLUTION  6    
 
 //------------ IO's    -------------------------------------------------------------------->
-#define STAGE_1_IO  PORT_A0   
-#define STAGE_2_IO  PORT_A1
-#define STAGE_3_IO  PORT_A2
-#define VALVE_IO    PORT_A3
+#define STAGE_1_IO  PORT_D0   
+#define STAGE_2_IO  PORT_D1
+#define STAGE_3_IO  PORT_D2
+#define VALVE_IO    PORT_D3
 #define FAN_IO      PORT_C0  
 
 // #define STOP_IO     DI_0    
@@ -32,9 +38,9 @@
 
 // #define A0    13 //ONE_WIRE_BUS  
 
-#define TA_AI       AI_1
-#define TS_AI       AI_2
-#define TC_AI       AI_3
+#define TA_AI       AI_0
+#define TS_AI       AI_1
+#define TC_AI       AI_2
 
 #define BUFFER_SIZE 60 
 
@@ -95,3 +101,5 @@ typedef struct { float N_f1_st2_ontime; float N_f1_st2_offtime; float N_s1_st2_o
 
 // fan (F1) and sprinklers (S1) STAGE 3 on and off time 
 typedef struct { float N_f1_st3_ontime; float N_f1_st3_offtime; float N_s1_st3_ontime; float N_s1_st3_offtime; } data_st3;
+
+#endif
