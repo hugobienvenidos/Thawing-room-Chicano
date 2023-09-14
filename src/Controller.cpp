@@ -22,8 +22,8 @@ void Controller::init() {
 }
 
 void Controller::setUpLogger() {
-  LOGGER.begin(115200);
-  LOGGER.println("Logger set up");
+  // LOGGER.begin(115200);
+  // LOGGER.println("Logger set up");
 }
 
 void Controller::setUpIOS() {

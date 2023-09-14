@@ -141,7 +141,7 @@ void setup() {
 
   wifi.setUpWiFi();
   wifi.setUpOTA();
-  // wifi.setUpWebServer(true);
+  wifi.setUpWebServer(true);
   controller.setUpRTC();
 
   mqtt.connect();

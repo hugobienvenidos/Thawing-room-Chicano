@@ -11,10 +11,10 @@
 #include <WiFiMulti.h>
 #include <WiFiClient.h>
 #include <ArduinoOTA.h>
-// #include "WebSerialLite.h"
+#include "WebSerialLite.h"
 #include "ESPAsyncWebServer.h"
 
-#define WebSerial Serial
+#define WebSerial WebSerial
 
 class WIFI {
   public:
