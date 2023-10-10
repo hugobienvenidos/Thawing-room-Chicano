@@ -5,7 +5,6 @@
 #include "config.h"
 #include <PID_v1.h>
 // #include <OneWire.h>
-#include <WiFiUdp.h>
 #include "secrets.h"
 #include <Arduino.h>
 #include "Controller.h"

@@ -5,7 +5,9 @@
 #include "WIFI.h"
 #include <Wire.h>
 #include <RTClib.h>
+#include <WiFiUdp.h>
 #include <Arduino.h>
+#include <NTPClient.h>
 
 #define LOGGER Serial
 
@@ -18,6 +20,11 @@
 #define TEMPERATURE_MAX  150
 #define ADC__RESOLUTION  4095 
 #define REFERENCE 3.3
+
+#define SECS_IN_HR 3600
+
+// #define TIME_ZONE_OFFSET_HRS            (-7)  /* Ensenada, México */
+#define TIME_ZONE_OFFSET_HRS            (+8)   /* Taiping, Malaysia */
 
 class Controller {
 private:

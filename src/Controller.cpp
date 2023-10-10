@@ -1,7 +1,9 @@
 #include "Controller.h"
 
 RTC_DS3231 rtc;
+WiFiUDP ntpUDP;
 TwoWire rtc_i2c = TwoWire(0);
+NTPClient timeClient(ntpUDP);
 
 const float voltage_per_step = REFERENCE / ADC__RESOLUTION;
 const int16_t range = TEMPERATURE_MAX - TEMPERATURE_MIN;
@@ -74,7 +76,27 @@ void Controller::setUpRTC() {
     LOGGER.println("Couldn't find RTC");
     while (1);
   }
-  rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+  // rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+
+  DateTime now = rtc.now();
+  if (now.year() <= 2000) {
+    Serial.println("RTC time seems invalid. Adjusting to NTP time.");
+    
+    timeClient.begin();
+    timeClient.setTimeOffset(SECS_IN_HR * TIME_ZONE_OFFSET_HRS);
+    timeClient.setUpdateInterval(SECS_IN_HR);
+    timeClient.update();
+
+    delay(1000); 
+
+    long epochTime = timeClient.getEpochTime();
+
+    // Convert received time from Epoch format to DateTime format
+    DateTime ntpTime(epochTime);
+
+    // Adjust RTC
+    rtc.adjust(ntpTime);
+  }
 }
 
 DateTime Controller::getDateTime() {
