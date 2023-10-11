@@ -74,8 +74,8 @@ void WIFI::setUpWebServer(bool brigeSerial){
   }, handle_update_progress_cb);
   
   if (brigeSerial) {
-    WebSerial.begin(&server);
-    WebSerial.onMessage(recvMsg);
+    // WebSerial.begin(&server);
+    // WebSerial.onMessage(recvMsg);
   }
   server.begin();
 }

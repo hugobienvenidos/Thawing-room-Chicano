@@ -11,7 +11,7 @@ const double temperature_per_step = range / REFERENCE;
 
 Controller::Controller(/* args */) {
   setUpLogger();
-  LOGGER.println("Controller created");
+  WebSerial.println("Controller created");
 }
 
 Controller::~Controller() {
@@ -24,8 +24,8 @@ void Controller::init() {
 }
 
 void Controller::setUpLogger() {
-  // LOGGER.begin(115200);
-  // LOGGER.println("Logger set up");
+  WebSerial.begin(115200);
+  WebSerial.println("Logger set up");
 }
 
 void Controller::setUpIOS() {
@@ -65,7 +65,7 @@ void Controller::setUpAnalogInputs() {
 void Controller::setUpI2C() {
   ;
   while (!rtc_i2c.begin(I2C_SDA, I2C_SCL)){
-    LOGGER.println("RTC I2C not found");
+    WebSerial.println("RTC I2C not found");
     delay(1000);
   }
   
@@ -73,7 +73,7 @@ void Controller::setUpI2C() {
 
 void Controller::setUpRTC() {
   if (!rtc.begin(&rtc_i2c)) {
-    LOGGER.println("Couldn't find RTC");
+    WebSerial.println("Couldn't find RTC");
     while (1);
   }
   // rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));

@@ -9,7 +9,7 @@
 #include <Arduino.h>
 #include <NTPClient.h>
 
-#define LOGGER Serial
+// #define LOGGER Serial
 
 #define AIR_PWM     7
 #define FREQ        5000
