@@ -232,9 +232,9 @@ void loop() {
     // for debug purpose
     WebSerial.println("Average: " + String(temp_data.AvgTs_N));
     // WebSerial.println(controller.readDigitalInput(DI0));
+    WebSerial.println("Ta: " + String(TA));
     WebSerial.println("Ts: " + String(TS));
     WebSerial.println("TC: " + String(TC));
-    WebSerial.println("Ta: " + String(TA));
     WebSerial.println(controller.readAnalogInput(TA_AI));
     WebSerial.println("Nstart: " + String(N_start));
     WebSerial.println("Nstop: " + String(N_stop));
@@ -793,12 +793,12 @@ void stopRoutine() {
 
 void updateTemperature() {
   TA = controller.readTempFrom(TA_AI);
-  // TS = controller.readTempFrom(TS_AI);
-  // TC = controller.readTempFrom(TC_AI);
+  TS = controller.readTempFrom(TS_AI);
+  TC = controller.readTempFrom(TC_AI);
 
   // TA = 0;
-  TS = 0;
-  TC = 0;
+  // TS = 0; // was desactivated
+  // TC = 0;
 }
 
 String addressToString(uint8_t *address) {
