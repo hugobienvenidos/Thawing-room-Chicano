@@ -124,6 +124,7 @@ PID air_in_feed_PID(&PIDinput, &Output, &Setpoint, Kp, Ki, Kd, DIRECT);  // DIRE
 void stopRoutine();
 void updateTemperature();
 void setStage(int Stage);
+void setUpDefaultParameters();
 String addressToString(uint8_t *address);
 int responseToInt(byte *value, size_t len);
 float responseToFloat(byte *value, size_t len);
@@ -131,6 +132,8 @@ void callback(char *topic, byte *payload, unsigned int len);  //callback functio
 
 void setup() {
   controller.init();
+  
+  setUpDefaultParameters();
 
   setStage(0);
 
@@ -198,18 +201,20 @@ void loop() {
 
   //---- Get surface temperature average with a FIFO buffer ---- //////////////////////////////// Something fuckin' wrong with the average
   if (millis() - ts_avg_timer >= AVG_RESOLUTION) {
-    const bool full_buffer = !(buffer_len < BUFFER_SIZE);
-    const uint8_t index = full_buffer ? buffer_index : buffer_len;
+    
+    if (buffer_len < BUFFER_SIZE) { //if buffer not full, we add the value
+        buffer_sum += TS_F;
+        buffer[buffer_len] = TS_F;
+        buffer_len++;
+      }
+      else { //buffer full, we remove the oldest value and add the new one
+        buffer_sum -= buffer[buffer_index];
+        buffer[buffer_index] = TS_F;
+        buffer_sum += TS_F;
+        buffer_index = (buffer_index + 1) % BUFFER_SIZE; // update the buffer index
+      }
 
-    buffer_sum += TS_F;
-    buffer[index] = TS_F;
-
-    if (full_buffer) {
-      buffer_sum -= buffer[index];
-      buffer_index = (index + 1) % BUFFER_SIZE;
-    } else buffer_len++;
-
-    avg_ts = buffer_sum / buffer_len;
+      avg_ts = buffer_sum/buffer_len;
 
     mqtt.publishData(AVG_TS_TOPIC, temp_data.AvgTs_N);
     // WebSerial.println("Temp data published");
@@ -826,6 +831,28 @@ int responseToInt(byte *value, size_t len) {
   String puta_mierda_mal_parida;
   for (int i = 0; i < len; i++) puta_mierda_mal_parida += (char)value[i];
   return puta_mierda_mal_parida.toInt();
+}
+
+void setUpDefaultParameters(){
+  // Default parameters
+  N_st1.N_f1_st1_ontime = 1;
+  N_st1.N_f1_st1_offtime = 1;
+
+  N_st2.N_f1_st2_ontime = 1;
+  N_st2.N_f1_st2_offtime = 1;
+  N_st2.N_s1_st2_ontime = 0.5;
+  N_st2.N_s1_st2_offtime = 1;
+
+  N_st3.N_f1_st3_ontime = 10;
+  N_st3.N_f1_st3_offtime = 30;
+  N_st3.N_s1_st3_ontime = 1;
+  N_st3.N_s1_st3_offtime = 15;
+
+  N_SP.N_A = 0.5;
+  N_SP.N_B = 20;
+
+  N_tset.N_ts_set = 4;
+  N_tset.N_tc_set = 2;
 }
 
 // float getIRTemp() {

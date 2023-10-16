@@ -32,9 +32,9 @@
 // #define DLY_S_IO    DI_1    
 // #define START_IO    DI_2    
 
-#define STOP_IO     PORT_B0  
+#define START_IO    PORT_B0  
 #define DLY_S_IO    PORT_B1   
-#define START_IO    PORT_B2
+#define STOP_IO     PORT_B2
 
 // #define A0    13 //ONE_WIRE_BUS  
 
