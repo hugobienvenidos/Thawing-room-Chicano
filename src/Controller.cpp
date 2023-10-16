@@ -79,7 +79,7 @@ void Controller::setUpRTC() {
   // rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
 
   DateTime now = rtc.now();
-  if (now.year() <= 2000) {
+  if (true) {
     Serial.println("RTC time seems invalid. Adjusting to NTP time.");
     
     timeClient.begin();
