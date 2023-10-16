@@ -324,6 +324,9 @@ void loop() {
     mqtt.publishData(m_F1, F1_data.M_F1);
     WebSerial.println("Stage 1 init M_F1 stop published ");
 
+    mqtt.publishData(m_F2, F2_data.M_F2);
+    WebSerial.println("Stage 1 init M_F2 stop published ");
+
     mqtt.publishData(m_S1, S1_data.M_S1);
     WebSerial.println("Stage 1 init M_S1 stop published");
   }
@@ -339,6 +342,9 @@ void loop() {
 
     mqtt.publishData(m_F1, F1_data.M_F1);
     WebSerial.println("Stage 1 init M_F1 stop published ");
+
+    mqtt.publishData(m_F2, F2_data.M_F2);
+    WebSerial.println("Stage 1 init M_F2 stop published ");
 
     mqtt.publishData(m_S1, S1_data.M_S1);
     WebSerial.println("Stage 1 init M_S1 stop published");
@@ -375,6 +381,9 @@ void loop() {
 
     mqtt.publishData(m_F1, F1_data.M_F1);
     WebSerial.println("All M_F1 stop published ");
+
+    mqtt.publishData(m_F2, F2_data.M_F2);
+    WebSerial.println("ALL M_F2 init M_F2 stop published ");
 
     mqtt.publishData(m_S1, S1_data.M_S1);
     WebSerial.println("All M_S1 stop published");
@@ -564,6 +573,9 @@ void loop() {
 
     mqtt.publishData(m_F1, F1_data.M_F1);
     WebSerial.println("stage 3 F1 init published ");
+
+    mqtt.publishData(m_F2, F2_data.M_F2);
+    WebSerial.println("Stage 3 M_F2 init published ");
 
     S1_data.M_S1 = 2;  // When M_S1 = 2 ==> OFF
 
@@ -818,6 +830,7 @@ void stopRoutine() {
     F2_data.M_F2 = 0;
 
     mqtt.publishData(m_F1, F1_data.M_F1);
+    mqtt.publishData(m_F2, F2_data.M_F2);
     mqtt.publishData(m_S1, S1_data.M_S1);
     setStage(0);
     WebSerial.println("Stage 0 Status Send packet ");
