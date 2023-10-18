@@ -91,14 +91,14 @@ void WIFI::setUpWiFi(){
     notConnectedCounter++;
     if(notConnectedCounter > 150) { // Reset board if not connected after 5s
       Serial.println("Resetting due to Wifi not connecting...");
-      // const uint8_t num_of_tries = EEPROM.readInt(1);
-      // if (num_of_tries == 3) break;          
-      // else {
-        // EEPROM.writeInt(1, num_of_tries + 1);
-        // EEPROM.commit();
-        // EEPROM.end();
+      const uint8_t num_of_tries = EEPROM.readInt(1);
+      if (num_of_tries == 3) break;          
+      else {
+        EEPROM.writeInt(1, num_of_tries + 1);
+        EEPROM.commit();
+        EEPROM.end();
         ESP.restart();          
-      // }
+      }
     }
   }
 
